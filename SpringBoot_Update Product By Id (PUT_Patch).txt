@@ -1,0 +1,159 @@
+			Date : 22/09/2020
+			Spring Boot 7:50
+			 Mr. RAGHU
+******************************************************************************************
+		 ## Operation#5 Update Product By Id (PUT) ##
+******************************************************************************************
+ This time Request Body contains JSON data and URL contains id as PathVariable.
+
+=> Read PathVariable(id), check for given id exist or not inside DB table?
+=> if Id exist, then copy not-null values to DB object from Request object.
+=> Finally call update method.
+
+=> if given path-variable is not exist?  Throw ProductNotFoundException,
+   that will call ExceptionHandler and returns Error Message.
+
+=> RESET_CONTENT(205) This status code indicates successfully operation done and
+   data is modified at server. It never returns any body(empty data). 
+   ie we can even create ResponseStatus only with HttpStatus also (data is optional)
+
+   ResponseEntity<String> resp = new ResponseEntity<String>(HttpStatus.RESET_CONTENT);
+
+--code--
+1. ProductUtil.java
+
+	public void copyNonNullValues(Product req,Product db) {
+		if(req.getProdCode()!=null) {
+			db.setProdCode(req.getProdCode());
+		}
+		if(req.getProdCost()!=null ) {
+			db.setProdCost(req.getProdCost());
+		}
+		if(req.getVendorName()!=null) {
+			db.setVendorName(req.getVendorName());
+		}
+		
+	}
+
+2. ProductRestController
+	@PutMapping("/modify/{id}")
+	public ResponseEntity<String> updateProduct(
+			@PathVariable Integer id,
+			@RequestBody Product product
+			) 
+	{
+		
+		ResponseEntity<String> resp = null;
+		try {
+			
+			//db object
+			Product p = service.getOneProduct(id);
+			//copy non-null values from request to Database object
+			util.copyNonNullValues(product, p);
+			//finally update this object
+			service.updateProduct(p);
+			
+			resp = new ResponseEntity<String>(
+					//"Product '"+id+"' Updated",
+					HttpStatus.RESET_CONTENT); //205- Reset-Content(PUT)
+			
+		} catch(ProductNotFoundException pne) {
+			throw pne; // re-throw exception to handler
+		} catch (Exception e) {
+			e.printStackTrace();
+			resp = new ResponseEntity<String>(
+					"Unable to Update Product", 
+					HttpStatus.INTERNAL_SERVER_ERROR); //500-ISE
+		}
+		
+		return resp;
+	}
+
+------POSTMAN SCREEN------------------------------
+PUT   http://localhost:8080/product/modify/1  SEND
+             Body
+	            (*) raw       JSON
+{
+    "prodCode" : "TV-AB580",
+    "prodCost" : 25000.0,
+    "vendorName" : "SAMSUNG-IND"
+}
+--------------------------------------------------
+
+
+
+******************************************************************************************
+		 ## Operation#5 Update Code By Id (PATCH) ##
+******************************************************************************************
+Partial data modifications are called as Patching.
+Ex: Update Pwd only for user(not all details)
+
+Requirement: updateProductCodeById
+
+SQL: update <tableName> set <columnName>=<value>    where <condition>
+HQL: update <classname> set <variableName>=<value>  where <condition>
+
+*)Note: @Modifying +  @Query indicates non-select operation , which must need
+   @Transactional (at service) provided by programmer, not handled by Spring boot.
+   For other operations like save,update,delete handled by Spring boot only.
+
+
+--code--
+1. Repository Interface
+	@Modifying
+	@Query("UPDATE Product SET prodCode=:code WHERE id=:id")
+	Integer updateProductCodeById(String code,Integer id);
+
+2. Service Interface
+  Integer updateProductCodeById(String code,Integer id);
+
+3. ProductServiceImpl
+
+	@Override
+	@Transactional
+	public Integer updateProductCodeById(
+			String code, Integer id) 
+	{
+		
+		if(!repo.existsById(id)) { //if not exist
+			throw new ProductNotFoundException(
+					new StringBuffer()
+					.append("Product '")
+					.append(id)
+					.append("' not exist")
+					.toString());
+		}
+		
+		return repo.updateProductCodeById(code, id);
+	}
+
+4. ProductRestController
+
+	@PatchMapping("/modify/{id}/{code}")
+	public ResponseEntity<String> updateProductCodeById(
+			@PathVariable Integer id,
+			@PathVariable String code
+			) 
+	{
+		ResponseEntity<String> resp = null;
+		try {
+			service.updateProductCodeById(code, id);
+			resp = new ResponseEntity<String>(
+					"Product '"+code+"' Updated",
+					HttpStatus.PARTIAL_CONTENT); //206- Reset-Content(PUT)
+			
+		} catch(ProductNotFoundException pne) {
+			throw pne; // re-throw exception to handler
+		} catch (Exception e) {
+			e.printStackTrace();
+			resp = new ResponseEntity<String>(
+					"Unable to Update Product", 
+					HttpStatus.INTERNAL_SERVER_ERROR); //500-ISE
+		}
+		return resp;
+	}
+
+
+-----------POSTMAN SCREEN----------------------------------
+PATCH  http://localhost:8080/product/modify/1/TV-ABC  SEND
+-----------------------------------------------------------
