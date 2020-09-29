@@ -1,0 +1,198 @@
+		
+		Level-I - Mini Project using ReST
+		Spring Boot ReST + Data JPA + MySQL
+
+Exception handling
+https://www.youtube.com/c/NareshIT/search?query=spring+boot+exception
+
+		## Operation#3 Get One Product By Id ##
+
+=> Request URL looks like http://localhost:8080/product/find/10
+=> In Controller method define Path using Static and Dynamic combination
+     like : /find/{id}
+=> Use below syntax to read Id
+   @PathVariable DataType key
+
+Ex: @PathVariable Integer id
+
+
+*) Create Breakpoint at BasicErrorController#error() method
+-> ctrl+shift+T (open pre-defined) -> BasicErrorController
+-> ctrl+O (all member) -> search with error method
+-> ctrl+shift+B (Breakpoint) inside error() method
+-> Run Main class > Right click on main > Debug > Spring Boot application (F11)
+-> Make Request using POSTMAN
+
+=============================POSTMAN====================================
+#1 Insert few Products
+#2 
+GET  http://localhost:8080/product/find/1  SEND   (200)
+
+GET  http://localhost:8080/product/find/12345  SEND (404)
+
+-----------------------------------------------------------------------
+
+Q) What is the benifit of writing ProductErrorHandler? Why cant we write same code in
+   Controller catch block?
+A) _______________
+
+******************************************************************************************
+		## Operation#4 Delete One Product By Id ##
+
+> Request URL looks like http://localhost:8080/product/remove/10
+=> In Controller method define Path using Static and Dynamic combination
+     like : /remove/{id}
+=> Use below syntax to read Id
+   @PathVariable DataType key
+
+Ex: @PathVariable Integer id
+
+
+=================Code =================
+***** Product RestController ************
+
+/***
+	 * Client makes Request using PathVariable.
+	 * If given id exist then service returns Product
+	 * Else it throws ProductNotFoundException.
+	 * 
+	 * If Exception Type is ProductNotFound Exception
+	 * then re-throw to Exception-Handler.
+	 * 
+	 * Else create ResponseEntity with 500-Message
+	 *  
+	 * @param id
+	 * @return ResponseEntity
+	 */
+
+	@GetMapping("/find/{id}")
+	public ResponseEntity<?> getOneProduct(
+			@PathVariable Integer id
+			)
+	{
+		ResponseEntity<?> resp = null;
+		try {
+			Product product = service.getOneProduct(id);
+			resp = new ResponseEntity<Product>(
+							product, 
+							HttpStatus.OK);
+		} catch(ProductNotFoundException  pne) {
+			throw pne; // re-throw exception
+		} catch (Exception e) {
+			e.printStackTrace();
+			resp = new ResponseEntity<String>(
+					"Unable to find Product", 
+					HttpStatus.INTERNAL_SERVER_ERROR); //500-ISE
+		}  
+		return resp;
+	}
+
+	
+	/***
+	 * Client makes Request using PathVariable.
+	 * If given id exist then service delete product
+	 * Else it throws ProductNotFoundException.
+	 * 
+	 * If Exception Type is ProductNotFound Exception
+	 * then re-throw to Exception-Handler.
+	 * 
+	 * Else create ResponseEntity with 500-Message
+	 *  
+	 * @param id
+	 * @return ResponseEntity
+	 */
+	
+	@DeleteMapping("/remove/{id}")
+	public ResponseEntity<String> deleteProduct(
+			@PathVariable Integer id
+			) 
+	{
+		ResponseEntity<String> resp = null;
+		try {
+			service.deleteProduct(id);
+			resp = new ResponseEntity<String>(
+					"Product '"+id+"' deleted", HttpStatus.OK);
+		} catch(ProductNotFoundException pne) {
+			throw pne; // re-throw exception to handler
+		} catch (Exception e) {
+			e.printStackTrace();
+			resp = new ResponseEntity<String>(
+					"Unable to Delete Product", 
+					HttpStatus.INTERNAL_SERVER_ERROR); //500-ISE
+		}
+		
+		return resp;
+	}
+
+
+******* ExceptionHandler **********
+package in.nareshit.raghu.exception.handler;
+
+import java.util.Date;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import in.nareshit.raghu.exception.ProductNotFoundException;
+import in.nareshit.raghu.model.ErrorType;
+
+//@ControllerAdvice
+@RestControllerAdvice
+public class ProductErrorHandler {
+	/**
+	 * In case of ProductNotFoundException is thrown
+	 * from any controller method, this logic gets
+	 * executed which behaves like re-usable and
+	 * clear code (Code Modularity)
+	 * @param pne
+	 * @return ResponseEntity
+	 */
+
+	//@ResponseBody
+	@ExceptionHandler(ProductNotFoundException.class)
+	public ResponseEntity<ErrorType> handleNotFound(
+			ProductNotFoundException pne)
+	{
+		
+		return new ResponseEntity<ErrorType>(
+				new ErrorType(
+						new Date(System.currentTimeMillis()).toString(), 
+						"404- NOT FOUND", 
+						pne.getMessage()), 
+				HttpStatus.NOT_FOUND);
+	}
+}
+
+************Error model class *******
+package in.nareshit.raghu.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ErrorType {
+
+	private String time;
+	private String status;
+	private String message;
+	
+}
+
+****** Custom Exception **********
+package in.nareshit.raghu.exception;
+public class ProductNotFoundException extends RuntimeException {
+	private static final long serialVersionUID = 1L;
+
+	public ProductNotFoundException() {
+		super();
+	}
+	
+	public ProductNotFoundException(String message) {
+		super(message);
+	}
+}
